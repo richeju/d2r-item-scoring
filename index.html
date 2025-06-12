@@ -181,7 +181,7 @@ document.getElementById("screenshot").addEventListener("change", function(event)
         Tesseract.recognize(dataURL, 'eng', {
           logger: m => console.log(m),
           workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
-          corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core.wasm.js',
+          corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/',
           langPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/lang-data',
           tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-% '
         }).then(({ data: { text } }) => {
