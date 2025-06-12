@@ -1,15 +1,10 @@
-# D2R Item Scoring
+# d2r-item-scoring
 
-This project provides a simple HTML page (`index.html`) that scores Diablo II: Resurrected equipment based on OCR-detected stats.
+This project scores Diablo II Resurrected equipment using OCR.
 
-## Prerequisites
-- A modern web browser.
-- Internet access to load scripts from the jsDelivr CDN.
+The page relies on Tesseract.js served from jsDelivr. The worker is configured with
+`corePath` set to `https://cdn.jsdelivr.net/npm/tesseract.js-core@5/`, allowing it
+to fetch either `tesseract-core.wasm.js` or `tesseract-core-simd.wasm.js` depending on
+SIMD support in the browser.
 
-## Usage
-1. Open `index.html` in your browser.
-2. Upload an item screenshot when prompted.
-3. Review the detected text and the scoring table.
-
-## Troubleshooting
-- If OCR does not start or the page looks broken, your network may be blocking the CDN used for Tesseract.js. Try allowing access to `cdn.jsdelivr.net` or host the dependencies locally.
+Open `index.html` in a modern browser to use the tool.
