@@ -92,7 +92,8 @@ function fixCommonOcrMistakes(text) {
     'DRAE': 'DROP'
   };
   for (let key in replacements) {
-    text = text.replace(new RegExp(key, 'g'), replacements[key]);
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    text = text.replace(new RegExp(escapedKey, 'g'), replacements[key]);
   }
   return text;
 }
