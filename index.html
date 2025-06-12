@@ -93,12 +93,16 @@ function fixCommonOcrMistakes(text) {
     'DAMACE': 'DAMAGE',
     'SECKETED': 'SOCKETED',
     'RE0UIRED': 'REQUIRED',
-    ' T ALL SKILLS': ' TO ALL SKILLS'
+    ' T ALL SKILLS': ' TO ALL SKILLS',
+    'TWE-HAND': 'TWO-HAND',
+    'NERMAL': 'NORMAL',
+    'DURASILITY': 'DURABILITY'
   };
   for (let key in replacements) {
     const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     text = text.replace(new RegExp(escapedKey, 'g'), replacements[key]);
   }
+  text = text.replace(/([0-9]+)6(?=\s|$)/g, '$1%');
   return text;
 }
 
@@ -146,8 +150,18 @@ function computeScore(rawText) {
     skills: extractValue(text, /\+([0-9]+)\s*(?:TO\s*ALL\s*SKILLS|A\s*TOUTES\s*LES\s*COMPETENCES)/),
     mf: extractValue(text, /([0-9]+)%\s*(?:BETTER\s*CHANCE.*FIND|CHANCE.*OBJETS)/),
     rep: extractValue(text, /(?:REPLENISH\s*LIFE|REGENER[EA]\s*LA\s*VIE)\s*\+?([0-9]+)/),
-    ar: extractValue(text, /\+([0-9]+)%?\s*(?:ATTACK\s*RATING|TAUX\s*D?ATTAQUE)/),
-    dmg: extractValue(text, /(?:ADDS\s*([0-9]+)-[0-9]+\s*DAMAGE|AJOUTE\s*([0-9]+)-[0-9]+\s*DEGATS)/),
+    ar: extractValue(
+      text,
+      /\+?([0-9]+)%?\s*(?:ATTACK\s*RATING|TAUX\s*D?ATTAQUE)(?:\s*BASED\s*ON\s*CHARACTER\s*LEVEL)?/
+    ),
+    dmg: extractValue(
+      text,
+      new RegExp(
+        '(?:ADDS\\s*([0-9]+)-[0-9]+\\s*DAMAGE|' +
+          'AJOUTE\\s*([0-9]+)-[0-9]+\\s*DEGATS|' +
+          '\\+([0-9]+)\\s*(?:TO\\s*MAXIMUM\\s*DAMAGE|MAXIMUM\\s*DAMAGE))'
+      )
+    ),
     frw: extractValue(text, /([0-9]+)%\s*(?:FASTER\s*RUN\/WALK|MARCHE.*COURSE.*RAPIDE)/),
     life: extractValue(text, /\+([0-9]+)\s*(?:TO\s*LIFE|A\s*LA\s*VIE)/),
     mana: extractValue(text, /\+([0-9]+)\s*(?:TO\s*MANA|AU\s*MANA)/),
