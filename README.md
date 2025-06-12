@@ -9,4 +9,6 @@ SIMD support in the browser. OCR now loads both English and French languages to
 better handle localized screenshots. The scoring logic includes French keyword
 support so screenshots captured in either language are parsed correctly.
 
-Open `index.html` in a modern browser to use the tool.
+Open `index.html` in a modern browser to use the tool. A debug panel displays
+the raw OCR output, normalized text, and computed stats so you can see how the
+score is derived.
