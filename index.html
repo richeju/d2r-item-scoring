@@ -14,6 +14,7 @@
     td, th { padding: 0.3rem; border-bottom: 1px solid #444; }
     textarea { width: 100%; height: 150px; background: #111; color: #eee; margin-top: 1rem; padding: 0.5rem; border: 1px solid #444; }
     button { margin-top: 0.5rem; padding: 0.4rem 1rem; background: #333; color: #eee; border: 1px solid #666; cursor: pointer; }
+    #debugLog { height: 120px; background: #111; color: #8cf; margin-top: 1rem; white-space: pre-wrap; }
     canvas { display: none; }
   </style>
 </head>
@@ -42,6 +43,7 @@
     </table>
     <textarea id="ocrInput" placeholder="OCR result here..."></textarea>
     <button onclick="processManualInput()">Recalculate score</button>
+    <textarea id="debugLog" readonly placeholder="Debug log..."></textarea>
   </div>
 </div>
 
@@ -97,40 +99,53 @@ function fixCommonOcrMistakes(text) {
 
 function extractValue(text, pattern) {
   const match = text.match(pattern);
-  return match ? parseInt(match[1]) : 0;
+  if (!match) return 0;
+  for (let i = 1; i < match.length; i++) {
+    if (match[i]) return parseInt(match[i]);
+  }
+  return 0;
+}
+
+function debugLog(message) {
+  const el = document.getElementById('debugLog');
+  if (el) el.value += message + '\n';
+  console.log(message);
 }
 
 function computeScore(rawText) {
+  const dbg = document.getElementById('debugLog');
+  if (dbg) dbg.value = '';
   const text = normalizeText(rawText);
+  debugLog('Normalized text: ' + text);
   const stats = {
-    leech: extractValue(text, /([0-9]+)%?\s*LIFE\s*STOLEN(?: PER HIT)?/),
+    leech: extractValue(text, /([0-9]+)%?\s*(?:LIFE\s*STOLEN(?:\s*PER\s*HIT)?|VOL\s*DE\s*VIE(?:\s*PAR\s*COUP)?)/),
     res: [
-      extractValue(text, /COLD\s*RESIST(?:ANCE)?\s*\+?([0-9]+)/),
-      extractValue(text, /LIGHTNING\s*RESIST(?:ANCE)?\s*\+?([0-9]+)/),
-      extractValue(text, /FIRE\s*RESIST(?:ANCE)?\s*\+?([0-9]+)/),
-      extractValue(text, /POISON\s*RESIST(?:ANCE)?\s*\+?([0-9]+)/)
+      extractValue(text, /(?:COLD\s*RESIST(?:ANCE)?|RESISTANCE\s*AU\s*FROID)\s*\+?([0-9]+)/),
+      extractValue(text, /(?:LIGHTNING\s*RESIST(?:ANCE)?|RESISTANCE\s*A\s*LA\s*FOUDRE)\s*\+?([0-9]+)/),
+      extractValue(text, /(?:FIRE\s*RESIST(?:ANCE)?|RESISTANCE\s*AU\s*FEU)\s*\+?([0-9]+)/),
+      extractValue(text, /(?:POISON\s*RESIST(?:ANCE)?|RESISTANCE\s*AU\s*POISON)\s*\+?([0-9]+)/)
     ].reduce((a, b) => a + b, 0),
-    dr: extractValue(text, /DAMAGE\s*REDUCED\s*BY\s*([0-9]+)/),
-    fcr: extractValue(text, /([0-9]+)%\s*FASTER\s*CAST\s*RATE/),
-    ias: extractValue(text, /([0-9]+)%\s*INCREASED\s*ATTACK\s*SPEED/),
-    cb: extractValue(text, /([0-9]+)%\s*CHANCE\s*OF\s*CRUSHING\s*BLOW/),
-    ds: extractValue(text, /([0-9]+)%\s*DEADLY\s*STRIKE/),
-    ed: extractValue(text, /([0-9]+)%\s*ENHANCED\s*DAMAGE/),
-    str: extractValue(text, /\+([0-9]+)\s*TO\s*STRENGTH/),
-    dex: extractValue(text, /\+([0-9]+)\s*TO\s*DEXTERITY/),
-    vit: extractValue(text, /\+([0-9]+)\s*TO\s*VITALITY/),
-    skills: extractValue(text, /\+([0-9]+)\s*TO\s*ALL\s*SKILLS/),
-    mf: extractValue(text, /([0-9]+)%\s*BETTER\s*CHANCE.*FIND/),
-    rep: extractValue(text, /REPLENISH\s*LIFE\s*\+?([0-9]+)/),
-    ar: extractValue(text, /\+([0-9]+)%?\s*ATTACK\s*RATING/),
-    dmg: extractValue(text, /ADDS\s*([0-9]+)-[0-9]+\s*DAMAGE/),
-    frw: extractValue(text, /([0-9]+)%\s*FASTER\s*RUN\/WALK/),
-    life: extractValue(text, /\+([0-9]+)\s*TO\s*LIFE/),
-    mana: extractValue(text, /\+([0-9]+)\s*TO\s*MANA/),
-    cold_dmg: extractValue(text, /ADDS\s*([0-9]+)-[0-9]+\s*COLD\s*DAMAGE/),
-    fire_dmg: extractValue(text, /ADDS\s*([0-9]+)-[0-9]+\s*FIRE\s*DAMAGE/),
-    lightning_dmg: extractValue(text, /ADDS\s*([0-9]+)-[0-9]+\s*LIGHTNING\s*DAMAGE/),
-    poison_dmg: extractValue(text, /ADDS\s*([0-9]+)-[0-9]+\s*POISON\s*DAMAGE/)
+    dr: extractValue(text, /(?:DAMAGE\s*REDUCED\s*BY|DEGATS\s*REDUITS\s*DE)\s*([0-9]+)/),
+    fcr: extractValue(text, /([0-9]+)%\s*(?:FASTER\s*CAST\s*RATE|VITESSE\s*DE\s*LANCEMENT)/),
+    ias: extractValue(text, /([0-9]+)%\s*(?:INCREASED\s*ATTACK\s*SPEED|VITESSE\s*D?ATTAQUE\s*AUGMENTEE)/),
+    cb: extractValue(text, /([0-9]+)%\s*(?:CHANCE\s*OF\s*CRUSHING\s*BLOW|CHANCE\s*DE\s*COUP\s*ECRASANT)/),
+    ds: extractValue(text, /([0-9]+)%\s*(?:DEADLY\s*STRIKE|COUP\s*MORTEL)/),
+    ed: extractValue(text, /([0-9]+)%\s*(?:ENHANCED\s*DAMAGE|DEGATS\s*AUGMENTES)/),
+    str: extractValue(text, /\+([0-9]+)\s*(?:TO\s*STRENGTH|FORCE)/),
+    dex: extractValue(text, /\+([0-9]+)\s*(?:TO\s*DEXTERITY|DEXTERITE)/),
+    vit: extractValue(text, /\+([0-9]+)\s*(?:TO\s*VITALITY|VITALITE)/),
+    skills: extractValue(text, /\+([0-9]+)\s*(?:TO\s*ALL\s*SKILLS|A\s*TOUTES\s*LES\s*COMPETENCES)/),
+    mf: extractValue(text, /([0-9]+)%\s*(?:BETTER\s*CHANCE.*FIND|CHANCE.*OBJETS)/),
+    rep: extractValue(text, /(?:REPLENISH\s*LIFE|REGENER[EA]\s*LA\s*VIE)\s*\+?([0-9]+)/),
+    ar: extractValue(text, /\+([0-9]+)%?\s*(?:ATTACK\s*RATING|TAUX\s*D?ATTAQUE)/),
+    dmg: extractValue(text, /(?:ADDS\s*([0-9]+)-[0-9]+\s*DAMAGE|AJOUTE\s*([0-9]+)-[0-9]+\s*DEGATS)/),
+    frw: extractValue(text, /([0-9]+)%\s*(?:FASTER\s*RUN\/WALK|MARCHE.*COURSE.*RAPIDE)/),
+    life: extractValue(text, /\+([0-9]+)\s*(?:TO\s*LIFE|A\s*LA\s*VIE)/),
+    mana: extractValue(text, /\+([0-9]+)\s*(?:TO\s*MANA|AU\s*MANA)/),
+    cold_dmg: extractValue(text, /(?:ADDS\s*([0-9]+)-[0-9]+\s*COLD\s*DAMAGE|AJOUTE\s*([0-9]+)-[0-9]+\s*DEGATS\s*DE\s*FROID)/),
+    fire_dmg: extractValue(text, /(?:ADDS\s*([0-9]+)-[0-9]+\s*FIRE\s*DAMAGE|AJOUTE\s*([0-9]+)-[0-9]+\s*DEGATS\s*DE\s*FEU)/),
+    lightning_dmg: extractValue(text, /(?:ADDS\s*([0-9]+)-[0-9]+\s*LIGHTNING\s*DAMAGE|AJOUTE\s*([0-9]+)-[0-9]+\s*DEGATS\s*DE\s*FOUDRE)/),
+    poison_dmg: extractValue(text, /(?:ADDS\s*([0-9]+)-[0-9]+\s*POISON\s*DAMAGE|AJOUTE\s*([0-9]+)-[0-9]+\s*DEGATS\s*DE\s*POISON)/)
   };
 
   const archetype = document.getElementById("archetype").value;
@@ -153,10 +168,13 @@ function computeScore(rawText) {
 
   document.getElementById("result").textContent = "Item total score: " + score;
   document.getElementById("ocrInput").value = text;
+  debugLog('Stats: ' + JSON.stringify(stats));
+  debugLog('Score: ' + score);
 }
 
 function processManualInput() {
   const text = document.getElementById("ocrInput").value;
+  debugLog('Manual input: ' + text);
   computeScore(text);
 }
 
@@ -185,6 +203,7 @@ document.getElementById("screenshot").addEventListener("change", function(event)
           tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-% '
         });
         const { data: { text } } = await worker.recognize(dataURL);
+        debugLog('Raw OCR: ' + text);
         computeScore(text);
         await worker.terminate();
       };
