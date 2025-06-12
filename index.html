@@ -202,17 +202,26 @@ document.getElementById("screenshot").addEventListener("change", function(event)
           console.log(m);
           debugLog(m.status ? `${m.status} ${Math.round((m.progress || 0) * 100)}%` : JSON.stringify(m));
         };
-        const version = Tesseract.version || '';
-        const isV5 = /^5/.test(version);
         let worker;
         try {
-          if (isV5) {
-            worker = await Tesseract.createWorker('eng+fra', 1, {
+          let result;
+          try {
+            // Try new async createWorker signature (v5)
+            result = Tesseract.createWorker('eng+fra', 1, {
               logger,
               corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/'
             });
+          } catch (e) {
+            // Fall back to old signature
+            result = Tesseract.createWorker({
+              logger,
+              corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/'
+            });
+          }
+          if (typeof result.then === 'function') {
+            worker = await result;
           } else {
-            worker = Tesseract.createWorker({ logger, corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/' });
+            worker = result;
             await worker.load();
             await worker.loadLanguage('eng+fra');
             await worker.initialize('eng+fra');
