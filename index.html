@@ -78,6 +78,9 @@ function normalizeText(text) {
       .replace(/#1@%/g, '+10%')
       .replace(/([0-9]+)%([A-Z])/g, '$1% $2')
       .replace(/([A-Z])([0-9]+)%/g, '$1 $2%')
+      .replace(/([A-Z])0([A-Z])/g, '$1O$2')
+      .replace(/([A-Z])5([A-Z])/g, '$1S$2')
+      .replace(/([A-Z])1([A-Z])/g, '$1I$2')
       .replace(/\s+/g, ' ')
       .toUpperCase()
   );
@@ -97,7 +100,10 @@ function fixCommonOcrMistakes(text) {
     ' T ALL SKILLS': ' TO ALL SKILLS',
     'TWE-HAND': 'TWO-HAND',
     'NERMAL': 'NORMAL',
-    'DURASILITY': 'DURABILITY'
+    'DURASILITY': 'DURABILITY',
+    'MIRE': 'DIRE',
+    '5KILLS': 'SKILLS',
+    '1TEM': 'ITEM'
   };
   for (let key in replacements) {
     const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -108,6 +114,8 @@ function fixCommonOcrMistakes(text) {
   text = text.replace(/\bTE\b/g, 'TO');
   text = text.replace(/PAMACE/g, 'DAMAGE');
   text = text.replace(/AMAZEN/g, 'AMAZON');
+  text = text.replace(/\bEF\b/g, 'OF');
+  text = text.replace(/\b0F\b/g, 'OF');
   return text;
 }
 
@@ -149,18 +157,19 @@ function computeScore(rawText) {
     cb: extractValue(text, /([0-9]+)%\s*(?:CHANCE\s*OF\s*CRUSHING\s*BLOW|CHANCE\s*DE\s*COUP\s*ECRASANT)/),
     ds: extractValue(text, /([0-9]+)%\s*(?:DEADLY\s*STRIKE|COUP\s*MORTEL)/),
     ed: extractValue(text, /([0-9]+)%\s*(?:ENHANCED\s*DAMAGE|DEGATS\s*AUGMENTES)/),
-    str: extractValue(text, /\+([0-9]+)\s*(?:TO\s*STRENGTH|FORCE)/),
-    dex: extractValue(text, /\+([0-9]+)\s*(?:TO\s*DEXTERITY|DEXTERITE)/),
-    vit: extractValue(text, /\+([0-9]+)\s*(?:TO\s*VITALITY|VITALITE)/),
+    ed_per_lvl: extractValue(text, /([0-9]+(?:\.[0-9]+)?)%\s*(?:ENHANCED\s*DAMAGE|DEGATS\s*AUGMENTES)\s*(?:PER\s*CHARACTER\s*LEVEL|PAR\s*NIVEAU|NIVEAU\s*DU\s*PERSONNAGE)/),
+    str: extractValue(text, /\+([0-9]+)\s*(?:TO\s*)?(?:STRENGTH|FORCE|STR)/),
+    dex: extractValue(text, /\+([0-9]+)\s*(?:TO\s*)?(?:DEXTERITY|DEXTERITE|DEX)/),
+    vit: extractValue(text, /\+([0-9]+)\s*(?:TO\s*)?(?:VITALITY|VITALITE|VIT)/),
     skills: extractValue(
       text,
-      /\+([0-9]+)\s*(?:TO\s*(?:ALL\s*SKILLS|[A-Z\s]+\s*SKILLS)|A\s*TOUTES\s*LES\s*COMPETENCES)/
+      /\+([0-9]+)\s*(?:(?:TO\s*)?(?:ALL\s*SKILLS|[A-Z\s]+\s*SKILLS)|A\s*TOUTES\s*LES\s*COMPETENCES)/
     ),
     mf: extractValue(text, /([0-9]+)%\s*(?:BETTER\s*CHANCE.*FIND|CHANCE.*OBJETS)/),
     rep: extractValue(text, /(?:REPLENISH\s*LIFE|REGENER[EA]\s*LA\s*VIE)\s*\+?([0-9]+)/),
     ar: extractValue(
       text,
-      /\+?([0-9]+)%?\s*(?:ATTACK\s*RATING|TAUX\s*D?ATTAQUE)(?:\s*BASED\s*ON\s*CHARACTER\s*LEVEL)?/
+      /\+?([0-9]+)%?\s*(?:ATTACK\s*RATING|TAUX\s*D?ATTAQUE)(?:\s*(?:BASED\s*ON\s*CHARACTER\s*LEVEL|PER\s*LEVEL|PAR\s*NIVEAU|NIVEAU\s*DU\s*PERSONNAGE))?/
     ),
     dmg: extractValue(
       text,
@@ -169,6 +178,10 @@ function computeScore(rawText) {
           'AJOUTE\\s*([0-9]+)-[0-9]+\\s*DEGATS|' +
           '\\+([0-9]+)\\s*(?:TO\\s*MAXIMUM\\s*DAMAGE|MAXIMUM\\s*DAMAGE))'
       )
+    ),
+    dmg_per_lvl: extractValue(
+      text,
+      /(?:ADDS\s*([0-9]+)-[0-9]+\s*DAMAGE|AJOUTE\s*([0-9]+)-[0-9]+\s*DEGATS)\s*(?:PER\s*LEVEL|PAR\s*NIVEAU|NIVEAU\s*DU\s*PERSONNAGE)/
     ),
     frw: extractValue(text, /([0-9]+)%\s*(?:FASTER\s*RUN\/WALK|MARCHE.*COURSE.*RAPIDE)/),
     life: extractValue(text, /\+([0-9]+)\s*(?:TO\s*LIFE|A\s*LA\s*VIE)/),
