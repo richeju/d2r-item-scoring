@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>D2R Equipment Scoring</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
+  <style>
+    body { font-family: Arial; background: #1e1e1e; color: #eee; padding: 2rem; }
+    .container { display: flex; flex-direction: row; gap: 2rem; align-items: flex-start; }
+    .left { flex: 1; }
+    .right { flex: 1; }
+    .result { font-size: 1.2rem; font-weight: bold; color: #6fcf97; }
+    table { width: 100%; margin-top: 1rem; border-collapse: collapse; color: #ccc; text-align: center; }
+    td, th { padding: 0.3rem; border-bottom: 1px solid #444; }
+    textarea { width: 100%; height: 150px; background: #111; color: #eee; margin-top: 1rem; padding: 0.5rem; border: 1px solid #444; }
+    button { margin-top: 0.5rem; padding: 0.4rem 1rem; background: #333; color: #eee; border: 1px solid #666; cursor: pointer; }
+    canvas { display: none; }
+  </style>
+</head>
+<body>
+
+<h1>D2R Equipment Scoring</h1>
+<label for="archetype">Choose archetype:</label>
+<select id="archetype">
+  <option value="melee">Melee</option>
+  <option value="caster">Magic</option>
+</select>
+
+<hr>
+<h2>OCR Screenshot (experimental)</h2>
+<div class="container">
+  <div class="left">
+    <input type="file" id="screenshot" accept="image/*">
+    <canvas id="canvas"></canvas>
+    <img id="preview" style="margin-top: 1rem; max-width: 100%;">
+  </div>
+  <div class="right">
+    <div class="result" id="result">Item total score: 0</div>
+    <table id="detailsTable">
+      <thead><tr><th>Stat</th><th>Value</th><th>Weight</th><th>Score</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <textarea id="ocrInput" placeholder="OCR result here..."></textarea>
+    <button onclick="processManualInput()">Recalculate score</button>
+  </div>
+</div>
+
+<script>
+const weightsByArchetype = {
+  melee: {
+    hp: 3, vit: 8, str: 6, dex: 4, res: 10, ias: 12, leech: 10, cb: 15, ds: 10, ed: 8, dr: 12,
+    lapk: 2, mapk: 1, fcr: 2, skills: 12, mf: 2, rep: 4, ar: 2, dmg: 6, frw: 4, life: 3,
+    mana: 1, cold_dmg: 2, fire_dmg: 2, lightning_dmg: 2, poison_dmg: 2
+  },
+  caster: {
+    hp: 4, vit: 10, str: 0, dex: 0, res: 12, ias: 2, leech: 0, cb: 0, ds: 0, ed: 0, dr: 6,
+    lapk: 1, mapk: 6, fcr: 10, skills: 15, mf: 4, rep: 3, ar: 0, dmg: 1, frw: 2, life: 4,
+    mana: 5, cold_dmg: 4, fire_dmg: 4, lightning_dmg: 4, poison_dmg: 4
+  }
+};
+
+function normalizeText(text) {
+  return fixCommonOcrMistakes(
+    text
+      .replace(/HTNING/g, 'LIGHTNING')
+      .replace(/ST®LEN/g, 'STOLEN')
+      .replace(/TIAGE/g, 'DAMAGE')
+      .replace(/1Q%/g, '10%')
+      .replace(/[Q\[\{\(]/g, '0')
+      .replace(/[\\]/g, '')
+      .replace(/[*|©@]/g, '+')
+      .replace(/Teo/gi, 'To')
+      .replace(/[|]/g, '1')
+      .replace(/#1@%/g, '+10%')
+      .replace(/([0-9]+)%([A-Z])/g, '$1% $2')
+      .replace(/([A-Z])([0-9]+)%/g, '$1 $2%')
+      .replace(/\s+/g, ' ')
+      .toUpperCase()
+  );
+}
+
+function fixCommonOcrMistakes(text) {
+  const replacements = {
+    'PEISEN': 'POISON',
+    'LIGLIGHTNING': 'LIGHTNING',
+    '+1%': '+10%',
+    'RERTL': 'RIGHT',
+    'CRLICK': 'CLICK',
+    'DRAE': 'DROP'
+  };
+  for (let key in replacements) {
+    text = text.replace(new RegExp(key, 'g'), replacements[key]);
+  }
+  return text;
+}
+
+function extractValue(text, pattern) {
+  const match = text.match(pattern);
+  return match ? parseInt(match[1]) : 0;
+}
+
+function computeScore(rawText) {
+  const text = normalizeText(rawText);
+  const stats = {
+    leech: extractValue(text, /([0-9]+)%?\s+LIFE STOLEN/),
+    res: [
+      extractValue(text, /COLD RESIST \+?([0-9]+)/),
+      extractValue(text, /LIGHTNING RESIST \+?([0-9]+)/),
+      extractValue(text, /FIRE RESIST \+?([0-9]+)/),
+      extractValue(text, /POISON RESIST \+?([0-9]+)/)
+    ].reduce((a, b) => a + b, 0),
+    dr: extractValue(text, /DAMAGE REDUCED BY ([0-9]+)/),
+    fcr: extractValue(text, /([0-9]+)% FASTER CAST RATE/),
+    ias: extractValue(text, /([0-9]+)% INCREASED ATTACK SPEED/),
+    cb: extractValue(text, /([0-9]+)% CHANCE OF CRUSHING BLOW/),
+    ds: extractValue(text, /([0-9]+)% DEADLY STRIKE/),
+    ed: extractValue(text, /([0-9]+)% ENHANCED DAMAGE/),
+    str: extractValue(text, /\+([0-9]+) TO STRENGTH/),
+    dex: extractValue(text, /\+([0-9]+) TO DEXTERITY/),
+    vit: extractValue(text, /\+([0-9]+) TO VITALITY/),
+    skills: extractValue(text, /\+([0-9]+) TO ALL SKILLS/),
+    mf: extractValue(text, /([0-9]+)% BETTER CHANCE.*FIND/),
+    rep: extractValue(text, /REPLENISH LIFE \+?([0-9]+)/),
+    ar: extractValue(text, /\+([0-9]+)%? ATTACK RATING/),
+    dmg: extractValue(text, /ADDS ([0-9]+)-[0-9]+ DAMAGE/),
+    frw: extractValue(text, /([0-9]+)% FASTER RUN\/WALK/),
+    life: extractValue(text, /\+([0-9]+) TO LIFE/),
+    mana: extractValue(text, /\+([0-9]+) TO MANA/),
+    cold_dmg: extractValue(text, /ADDS ([0-9]+)-[0-9]+ COLD DAMAGE/),
+    fire_dmg: extractValue(text, /ADDS ([0-9]+)-[0-9]+ FIRE DAMAGE/),
+    lightning_dmg: extractValue(text, /ADDS ([0-9]+)-[0-9]+ LIGHTNING DAMAGE/),
+    poison_dmg: extractValue(text, /ADDS ([0-9]+)-[0-9]+ POISON DAMAGE/)
+  };
+
+  const archetype = document.getElementById("archetype").value;
+  const weights = weightsByArchetype[archetype];
+  let score = 0;
+  const tbody = document.getElementById("detailsTable").querySelector("tbody");
+  tbody.innerHTML = "";
+
+  for (let key in stats) {
+    const value = stats[key];
+    const weight = weights[key] || 0;
+    const subtotal = value * weight;
+    if (value && weight) {
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>${key}</td><td>${value}</td><td>${weight}</td><td>${subtotal}</td>`;
+      tbody.appendChild(row);
+      score += subtotal;
+    }
+  }
+
+  document.getElementById("result").textContent = "Item total score: " + score;
+  document.getElementById("ocrInput").value = text;
+}
+
+function processManualInput() {
+  const text = document.getElementById("ocrInput").value;
+  computeScore(text);
+}
+
+document.getElementById("screenshot").addEventListener("change", function(event) {
+  const file = event.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+
+        // Traitement de l'image complète sans recadrage
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.filter = 'brightness(1.8) contrast(1.4)';
+        ctx.drawImage(img, 0, 0);
+
+        const dataURL = canvas.toDataURL();
+        document.getElementById("preview").src = dataURL;
+
+        Tesseract.recognize(dataURL, 'eng', {
+          logger: m => console.log(m),
+          tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-% '
+        }).then(({ data: { text } }) => {
+          computeScore(text);
+        });
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+});
+</script>
+
+</body>
+</html>
