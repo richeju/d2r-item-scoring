@@ -62,6 +62,7 @@ const weightsByArchetype = {
 function normalizeText(text) {
   return fixCommonOcrMistakes(
     text
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/HTNING/g, 'LIGHTNING')
       .replace(/ST®LEN/g, 'STOLEN')
       .replace(/TIAGE/g, 'DAMAGE')
@@ -102,34 +103,34 @@ function extractValue(text, pattern) {
 function computeScore(rawText) {
   const text = normalizeText(rawText);
   const stats = {
-    leech: extractValue(text, /([0-9]+)%?\s+LIFE STOLEN/),
+    leech: extractValue(text, /([0-9]+)%?\s*LIFE\s*STOLEN(?: PER HIT)?/),
     res: [
-      extractValue(text, /COLD RESIST \+?([0-9]+)/),
-      extractValue(text, /LIGHTNING RESIST \+?([0-9]+)/),
-      extractValue(text, /FIRE RESIST \+?([0-9]+)/),
-      extractValue(text, /POISON RESIST \+?([0-9]+)/)
+      extractValue(text, /COLD\s*RESIST(?:ANCE)?\s*\+?([0-9]+)/),
+      extractValue(text, /LIGHTNING\s*RESIST(?:ANCE)?\s*\+?([0-9]+)/),
+      extractValue(text, /FIRE\s*RESIST(?:ANCE)?\s*\+?([0-9]+)/),
+      extractValue(text, /POISON\s*RESIST(?:ANCE)?\s*\+?([0-9]+)/)
     ].reduce((a, b) => a + b, 0),
-    dr: extractValue(text, /DAMAGE REDUCED BY ([0-9]+)/),
-    fcr: extractValue(text, /([0-9]+)% FASTER CAST RATE/),
-    ias: extractValue(text, /([0-9]+)% INCREASED ATTACK SPEED/),
-    cb: extractValue(text, /([0-9]+)% CHANCE OF CRUSHING BLOW/),
-    ds: extractValue(text, /([0-9]+)% DEADLY STRIKE/),
-    ed: extractValue(text, /([0-9]+)% ENHANCED DAMAGE/),
-    str: extractValue(text, /\+([0-9]+) TO STRENGTH/),
-    dex: extractValue(text, /\+([0-9]+) TO DEXTERITY/),
-    vit: extractValue(text, /\+([0-9]+) TO VITALITY/),
-    skills: extractValue(text, /\+([0-9]+) TO ALL SKILLS/),
-    mf: extractValue(text, /([0-9]+)% BETTER CHANCE.*FIND/),
-    rep: extractValue(text, /REPLENISH LIFE \+?([0-9]+)/),
-    ar: extractValue(text, /\+([0-9]+)%? ATTACK RATING/),
-    dmg: extractValue(text, /ADDS ([0-9]+)-[0-9]+ DAMAGE/),
-    frw: extractValue(text, /([0-9]+)% FASTER RUN\/WALK/),
-    life: extractValue(text, /\+([0-9]+) TO LIFE/),
-    mana: extractValue(text, /\+([0-9]+) TO MANA/),
-    cold_dmg: extractValue(text, /ADDS ([0-9]+)-[0-9]+ COLD DAMAGE/),
-    fire_dmg: extractValue(text, /ADDS ([0-9]+)-[0-9]+ FIRE DAMAGE/),
-    lightning_dmg: extractValue(text, /ADDS ([0-9]+)-[0-9]+ LIGHTNING DAMAGE/),
-    poison_dmg: extractValue(text, /ADDS ([0-9]+)-[0-9]+ POISON DAMAGE/)
+    dr: extractValue(text, /DAMAGE\s*REDUCED\s*BY\s*([0-9]+)/),
+    fcr: extractValue(text, /([0-9]+)%\s*FASTER\s*CAST\s*RATE/),
+    ias: extractValue(text, /([0-9]+)%\s*INCREASED\s*ATTACK\s*SPEED/),
+    cb: extractValue(text, /([0-9]+)%\s*CHANCE\s*OF\s*CRUSHING\s*BLOW/),
+    ds: extractValue(text, /([0-9]+)%\s*DEADLY\s*STRIKE/),
+    ed: extractValue(text, /([0-9]+)%\s*ENHANCED\s*DAMAGE/),
+    str: extractValue(text, /\+([0-9]+)\s*TO\s*STRENGTH/),
+    dex: extractValue(text, /\+([0-9]+)\s*TO\s*DEXTERITY/),
+    vit: extractValue(text, /\+([0-9]+)\s*TO\s*VITALITY/),
+    skills: extractValue(text, /\+([0-9]+)\s*TO\s*ALL\s*SKILLS/),
+    mf: extractValue(text, /([0-9]+)%\s*BETTER\s*CHANCE.*FIND/),
+    rep: extractValue(text, /REPLENISH\s*LIFE\s*\+?([0-9]+)/),
+    ar: extractValue(text, /\+([0-9]+)%?\s*ATTACK\s*RATING/),
+    dmg: extractValue(text, /ADDS\s*([0-9]+)-[0-9]+\s*DAMAGE/),
+    frw: extractValue(text, /([0-9]+)%\s*FASTER\s*RUN\/WALK/),
+    life: extractValue(text, /\+([0-9]+)\s*TO\s*LIFE/),
+    mana: extractValue(text, /\+([0-9]+)\s*TO\s*MANA/),
+    cold_dmg: extractValue(text, /ADDS\s*([0-9]+)-[0-9]+\s*COLD\s*DAMAGE/),
+    fire_dmg: extractValue(text, /ADDS\s*([0-9]+)-[0-9]+\s*FIRE\s*DAMAGE/),
+    lightning_dmg: extractValue(text, /ADDS\s*([0-9]+)-[0-9]+\s*LIGHTNING\s*DAMAGE/),
+    poison_dmg: extractValue(text, /ADDS\s*([0-9]+)-[0-9]+\s*POISON\s*DAMAGE/)
   };
 
   const archetype = document.getElementById("archetype").value;
@@ -179,7 +180,7 @@ document.getElementById("screenshot").addEventListener("change", function(event)
         document.getElementById("preview").src = dataURL;
 
         // OCR using a dedicated worker instead of the static recognize helper
-        const worker = await Tesseract.createWorker('eng', 1, { logger: m => console.log(m) });
+        const worker = await Tesseract.createWorker('eng+fra', 1, { logger: m => console.log(m) });
         await worker.setParameters({
           tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-% '
         });
