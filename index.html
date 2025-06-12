@@ -165,7 +165,7 @@ document.getElementById("screenshot").addEventListener("change", function(event)
     const reader = new FileReader();
     reader.onload = function(e) {
       const img = new Image();
-      img.onload = function() {
+      img.onload = async function() {
         const canvas = document.getElementById("canvas");
         const ctx = canvas.getContext("2d");
 
@@ -178,15 +178,14 @@ document.getElementById("screenshot").addEventListener("change", function(event)
         const dataURL = canvas.toDataURL();
         document.getElementById("preview").src = dataURL;
 
-        Tesseract.recognize(dataURL, 'eng', {
-          logger: m => console.log(m),
-          workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
-          corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/',
-          langPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/lang-data',
+        // OCR using a dedicated worker instead of the static recognize helper
+        const worker = await Tesseract.createWorker('eng', 1, { logger: m => console.log(m) });
+        await worker.setParameters({
           tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-% '
-        }).then(({ data: { text } }) => {
-          computeScore(text);
         });
+        const { data: { text } } = await worker.recognize(dataURL);
+        computeScore(text);
+        await worker.terminate();
       };
       img.src = e.target.result;
     };
