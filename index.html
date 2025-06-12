@@ -198,11 +198,15 @@ document.getElementById("screenshot").addEventListener("change", function(event)
         document.getElementById("preview").src = dataURL;
 
         // OCR using a dedicated worker instead of the static recognize helper
-        const worker = await Tesseract.createWorker('eng+fra', 1, { logger: m => console.log(m) });
+        const worker = await Tesseract.createWorker('eng+fra', 1, {
+          logger: m => console.log(m),
+          corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/'
+        });
         await worker.setParameters({
           tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-% '
         });
         const { data: { text } } = await worker.recognize(dataURL);
+        console.log(text);
         debugLog('Raw OCR: ' + text);
         computeScore(text);
         await worker.terminate();
