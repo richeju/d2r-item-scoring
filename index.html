@@ -89,7 +89,11 @@ function fixCommonOcrMistakes(text) {
     '+1%': '+10%',
     'RERTL': 'RIGHT',
     'CRLICK': 'CLICK',
-    'DRAE': 'DROP'
+    'DRAE': 'DROP',
+    'DAMACE': 'DAMAGE',
+    'SECKETED': 'SOCKETED',
+    'RE0UIRED': 'REQUIRED',
+    ' T ALL SKILLS': ' TO ALL SKILLS'
   };
   for (let key in replacements) {
     const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -120,12 +124,16 @@ function computeScore(rawText) {
   debugLog('Normalized text: ' + text);
   const stats = {
     leech: extractValue(text, /([0-9]+)%?\s*(?:LIFE\s*STOLEN(?:\s*PER\s*HIT)?|VOL\s*DE\s*VIE(?:\s*PAR\s*COUP)?)/),
-    res: [
-      extractValue(text, /(?:COLD\s*RESIST(?:ANCE)?|RESISTANCE\s*AU\s*FROID)\s*\+?([0-9]+)/),
-      extractValue(text, /(?:LIGHTNING\s*RESIST(?:ANCE)?|RESISTANCE\s*A\s*LA\s*FOUDRE)\s*\+?([0-9]+)/),
-      extractValue(text, /(?:FIRE\s*RESIST(?:ANCE)?|RESISTANCE\s*AU\s*FEU)\s*\+?([0-9]+)/),
-      extractValue(text, /(?:POISON\s*RESIST(?:ANCE)?|RESISTANCE\s*AU\s*POISON)\s*\+?([0-9]+)/)
-    ].reduce((a, b) => a + b, 0),
+    res: (function() {
+      const indiv = [
+        extractValue(text, /(?:COLD\s*RESIST(?:ANCE)?|RESISTANCE\s*AU\s*FROID)\s*\+?([0-9]+)/),
+        extractValue(text, /(?:LIGHTNING\s*RESIST(?:ANCE)?|RESISTANCE\s*A\s*LA\s*FOUDRE)\s*\+?([0-9]+)/),
+        extractValue(text, /(?:FIRE\s*RESIST(?:ANCE)?|RESISTANCE\s*AU\s*FEU)\s*\+?([0-9]+)/),
+        extractValue(text, /(?:POISON\s*RESIST(?:ANCE)?|RESISTANCE\s*AU\s*POISON)\s*\+?([0-9]+)/)
+      ];
+      const allRes = extractValue(text, /ALL\s*RESIST(?:ANCE)?S?\s*\+?([0-9]+)/);
+      return indiv.reduce((a, b) => a + b, 0) + (allRes ? allRes * 4 : 0);
+    })(),
     dr: extractValue(text, /(?:DAMAGE\s*REDUCED\s*BY|DEGATS\s*REDUITS\s*DE)\s*([0-9]+)/),
     fcr: extractValue(text, /([0-9]+)%\s*(?:FASTER\s*CAST\s*RATE|VITESSE\s*DE\s*LANCEMENT)/),
     ias: extractValue(text, /([0-9]+)%\s*(?:INCREASED\s*ATTACK\s*SPEED|VITESSE\s*D?ATTAQUE\s*AUGMENTEE)/),
