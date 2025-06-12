@@ -103,6 +103,10 @@ function fixCommonOcrMistakes(text) {
     text = text.replace(new RegExp(escapedKey, 'g'), replacements[key]);
   }
   text = text.replace(/([0-9]+)6(?=\s|$)/g, '$1%');
+  text = text.replace(/\bN\s*CHARACTER\s*LEVEL\b/g, 'ON CHARACTER LEVEL');
+  text = text.replace(/\bTE\b/g, 'TO');
+  text = text.replace(/PAMACE/g, 'DAMAGE');
+  text = text.replace(/AMAZEN/g, 'AMAZON');
   return text;
 }
 
@@ -147,7 +151,10 @@ function computeScore(rawText) {
     str: extractValue(text, /\+([0-9]+)\s*(?:TO\s*STRENGTH|FORCE)/),
     dex: extractValue(text, /\+([0-9]+)\s*(?:TO\s*DEXTERITY|DEXTERITE)/),
     vit: extractValue(text, /\+([0-9]+)\s*(?:TO\s*VITALITY|VITALITE)/),
-    skills: extractValue(text, /\+([0-9]+)\s*(?:TO\s*ALL\s*SKILLS|A\s*TOUTES\s*LES\s*COMPETENCES)/),
+    skills: extractValue(
+      text,
+      /\+([0-9]+)\s*(?:TO\s*(?:ALL\s*SKILLS|[A-Z\s]+\s*SKILLS)|A\s*TOUTES\s*LES\s*COMPETENCES)/
+    ),
     mf: extractValue(text, /([0-9]+)%\s*(?:BETTER\s*CHANCE.*FIND|CHANCE.*OBJETS)/),
     rep: extractValue(text, /(?:REPLENISH\s*LIFE|REGENER[EA]\s*LA\s*VIE)\s*\+?([0-9]+)/),
     ar: extractValue(
