@@ -1,0 +1,13 @@
+{
+  "name": "d2r-item-scoring",
+  "version": "1.0.0",
+  "description": "This project scores Diablo II Resurrected equipment using OCR.",
+  "main": "index.js",
+  "scripts": {
+    "test": "node tests/test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
