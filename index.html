@@ -32,6 +32,7 @@
 <div class="container">
   <div class="left">
     <input type="file" id="screenshot" accept="image/*">
+    <button id="resetBtn" onclick="resetSelection()">Reset selection</button>
     <canvas id="canvas"></canvas>
     <img id="preview" style="margin-top: 1rem; max-width: 100%;">
   </div>
@@ -206,6 +207,18 @@ function processManualInput() {
   const text = document.getElementById("ocrInput").value;
   debugLog('Manual input: ' + text);
   computeScore(text);
+}
+
+function resetSelection() {
+  document.getElementById('screenshot').value = '';
+  document.getElementById('preview').src = '';
+  document.getElementById('ocrInput').value = '';
+  document.getElementById('result').textContent = 'Item total score: 0';
+  document.getElementById('detailsTable').querySelector('tbody').innerHTML = '';
+  document.getElementById('debugLog').value = '';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
 document.getElementById("screenshot").addEventListener("change", function(event) {
