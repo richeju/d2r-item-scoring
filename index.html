@@ -197,19 +197,26 @@ document.getElementById("screenshot").addEventListener("change", function(event)
         const dataURL = canvas.toDataURL();
         document.getElementById("preview").src = dataURL;
 
-        // OCR using a dedicated worker instead of the static recognize helper
-        const worker = Tesseract.createWorker({
-          logger: m => {
-            console.log(m);
-            debugLog(m.status ? `${m.status} ${Math.round((m.progress || 0) * 100)}%` : JSON.stringify(m));
-          },
-          corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/'
-        });
-
+        // OCR using a dedicated worker with auto version detection
+        const logger = m => {
+          console.log(m);
+          debugLog(m.status ? `${m.status} ${Math.round((m.progress || 0) * 100)}%` : JSON.stringify(m));
+        };
+        const version = Tesseract.version || '';
+        const isV5 = /^5/.test(version);
+        let worker;
         try {
-          await worker.load();
-          await worker.loadLanguage('eng+fra');
-          await worker.initialize('eng+fra');
+          if (isV5) {
+            worker = await Tesseract.createWorker('eng+fra', 1, {
+              logger,
+              corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/'
+            });
+          } else {
+            worker = Tesseract.createWorker({ logger, corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/' });
+            await worker.load();
+            await worker.loadLanguage('eng+fra');
+            await worker.initialize('eng+fra');
+          }
           await worker.setParameters({
             tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-% '
           });
@@ -220,7 +227,7 @@ document.getElementById("screenshot").addEventListener("change", function(event)
           console.error(err);
           debugLog('OCR error: ' + err.message);
         } finally {
-          await worker.terminate();
+          if (worker) await worker.terminate();
         }
       };
       img.src = e.target.result;
