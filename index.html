@@ -413,17 +413,27 @@ document.getElementById('screenshot').addEventListener('change', async function(
 });
 
 document.addEventListener('paste', async event => {
-  const items = event.clipboardData && event.clipboardData.items;
-  if (!items) return;
-  for (const item of items) {
-    if (item.type && item.type.startsWith('image/')) {
-      event.preventDefault();
-      const blob = item.getAsFile();
-      debugLog('Image collée depuis le presse-papiers, traitement...');
-      await processImageBlob(blob);
-      return;
-    }
+  const clipboardData = event.clipboardData || window.clipboardData;
+  if (!clipboardData) {
+    debugLog('Impossible de lire le presse-papiers.');
+    return;
   }
+  const items = clipboardData.items || clipboardData.files;
+  if (!items || !items.length) {
+    debugLog('Presse-papiers sans image détectée.');
+    return;
+  }
+  const iterableItems = Array.from(items);
+  const imageItem = iterableItems.find(item => item.type && item.type.startsWith('image/'));
+  if (!imageItem) return;
+  event.preventDefault();
+  const blob = imageItem.getAsFile ? imageItem.getAsFile() : imageItem;
+  if (!blob) {
+    debugLog("Impossible de récupérer l'image collée.");
+    return;
+  }
+  debugLog('Image collée depuis le presse-papiers, traitement...');
+  await processImageBlob(blob);
 });
 </script>
 
