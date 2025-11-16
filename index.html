@@ -108,7 +108,7 @@ function summarizeScore(score, archetype, contributions) {
 }
 
 function normalizeText(text) {
-  return fixCommonOcrMistakes(
+  const cleaned = fixCommonOcrMistakes(
     text
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/HTNING/g, 'LIGHTNING')
@@ -129,6 +129,28 @@ function normalizeText(text) {
       .replace(/\s+/g, ' ')
       .toUpperCase()
   );
+  return restoreMissingPlusSigns(cleaned);
+}
+
+function restoreMissingPlusSigns(text) {
+  const keywords = [
+    'STRENGTH', 'FORCE', 'DEXTERITY', 'DEXTERITE', 'VITALITY', 'VITALITE',
+    'ENERGY', 'ENERGIE', 'LIFE', 'VIE', 'MANA', 'SKILLS', 'COMPETENCES',
+    'ALL SKILLS', 'LIGHTNING RESIST', 'LIGHTNING RESISTANCE', 'FIRE RESIST', 'FIRE RESISTANCE',
+    'COLD RESIST', 'COLD RESISTANCE', 'POISON RESIST', 'POISON RESISTANCE',
+    'RESISTANCE AU FROID', 'RESISTANCE AU FEU', 'RESISTANCE AU POISON', 'RESISTANCE A LA FOUDRE',
+    'ALL RESIST', 'ALL RESISTANCES', 'ATTACK RATING', 'TAUX D ATTAQUE',
+    'MAXIMUM DAMAGE', 'MAXIMUM DEGATS', 'MINIMUM DAMAGE', 'MINIMUM DEGATS'
+  ];
+  const keywordsPattern = keywords
+    .map(keyword => keyword.replace(/\s+/g, '\\s+'))
+    .join('|');
+  if (!keywordsPattern) return text;
+  const statRegex = new RegExp(
+    `(^|\\s)([0-9]+)(?=\\s*(?:%\\s*)?(?:TO\\s+)?(?:${keywordsPattern})\\b)`,
+    'g'
+  );
+  return text.replace(statRegex, (match, prefix, value) => `${prefix}+${value}`);
 }
 
 function fixCommonOcrMistakes(text) {
