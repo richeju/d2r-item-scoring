@@ -10,6 +10,17 @@
     .left { flex: 1; }
     .right { flex: 1; }
     .result { font-size: 1.2rem; font-weight: bold; color: #6fcf97; }
+    .evaluation {
+      margin-top: 0.75rem;
+      padding: 0.75rem 1rem;
+      background: rgba(255, 255, 255, 0.04);
+      border-left: 4px solid #6fcf97;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+    .evaluation.evaluation-average { border-left-color: #f2c94c; color: #f2c94c; }
+    .evaluation.evaluation-poor { border-left-color: #eb5757; color: #eb5757; }
+    .evaluation.evaluation-strong { border-left-color: #6fcf97; color: #6fcf97; }
     table { width: 100%; margin-top: 1rem; border-collapse: collapse; color: #ccc; text-align: center; }
     td, th { padding: 0.3rem; border-bottom: 1px solid #444; }
     textarea { width: 100%; height: 150px; background: #111; color: #eee; margin-top: 1rem; padding: 0.5rem; border: 1px solid #444; }
@@ -40,6 +51,7 @@
   </div>
   <div class="right">
     <div class="result" id="result">Item total score: 0</div>
+    <div id="evaluation" class="evaluation">Chargez un objet pour voir l'analyse.</div>
     <table id="detailsTable">
       <thead><tr><th>Stat</th><th>Value</th><th>Weight</th><th>Score</th></tr></thead>
       <tbody></tbody>
@@ -63,6 +75,37 @@ const weightsByArchetype = {
     mana: 5, cold_dmg: 4, fire_dmg: 4, lightning_dmg: 4, poison_dmg: 4
   }
 };
+
+const evaluationThresholds = {
+  melee: [
+    { limit: 60, label: 'Faible', className: 'evaluation-poor', hint: "Les bonus sont trop faibles pour un perso mêlée." },
+    { limit: 120, label: 'Correct', className: 'evaluation-average', hint: "Correct pour dépanner, mais il existe mieux." },
+    { limit: Infinity, label: 'Excellent', className: 'evaluation-strong', hint: "Très bon potentiel pour un build mêlée." }
+  ],
+  caster: [
+    { limit: 50, label: 'Faible', className: 'evaluation-poor', hint: "Pas assez d'avantages pour un lanceur de sorts." },
+    { limit: 100, label: 'Correct', className: 'evaluation-average', hint: "Peut rendre service en attendant mieux." },
+    { limit: Infinity, label: 'Excellent', className: 'evaluation-strong', hint: "Convient bien à un caster ambitieux." }
+  ]
+};
+
+function describeTopContributions(contributions) {
+  if (!contributions.length) return '';
+  const top = contributions
+    .sort((a, b) => b.subtotal - a.subtotal)
+    .slice(0, 3)
+    .map(entry => `${entry.key} (+${entry.subtotal})`);
+  return 'Points forts : ' + top.join(', ') + '.';
+}
+
+function summarizeScore(score, archetype, contributions) {
+  const tiers = evaluationThresholds[archetype] || evaluationThresholds.melee;
+  const tier = tiers.find(t => score < t.limit) || tiers[tiers.length - 1];
+  return {
+    message: `${tier.label} (${score} pts). ${tier.hint} ${describeTopContributions(contributions)}`.trim(),
+    className: tier.className
+  };
+}
 
 function normalizeText(text) {
   return fixCommonOcrMistakes(
@@ -211,6 +254,7 @@ function computeScore(rawText) {
   const tbody = document.getElementById("detailsTable").querySelector("tbody");
   tbody.innerHTML = "";
 
+  const contributions = [];
   for (let key in stats) {
     const value = stats[key];
     const weight = weights[key] || 0;
@@ -220,11 +264,16 @@ function computeScore(rawText) {
       row.innerHTML = `<td>${key}</td><td>${value}</td><td>${weight}</td><td>${subtotal}</td>`;
       tbody.appendChild(row);
       score += subtotal;
+      contributions.push({ key, subtotal });
     }
   }
 
   document.getElementById("result").textContent = "Item total score: " + score;
   document.getElementById("ocrInput").value = text;
+  const evaluationBox = document.getElementById('evaluation');
+  const summary = summarizeScore(score, archetype, contributions);
+  evaluationBox.textContent = summary.message;
+  evaluationBox.className = `evaluation ${summary.className}`;
   debugLog('Stats: ' + JSON.stringify(stats));
   debugLog('Score: ' + score);
 }
@@ -242,6 +291,11 @@ function resetSelection() {
   document.getElementById('result').textContent = 'Item total score: 0';
   document.getElementById('detailsTable').querySelector('tbody').innerHTML = '';
   document.getElementById('debugLog').value = '';
+  const evaluationBox = document.getElementById('evaluation');
+  if (evaluationBox) {
+    evaluationBox.textContent = 'Chargez un objet pour voir l'analyse.';
+    evaluationBox.className = 'evaluation';
+  }
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
