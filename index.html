@@ -52,12 +52,12 @@
 const weightsByArchetype = {
   melee: {
     hp: 3, vit: 8, str: 6, dex: 4, res: 10, ias: 12, leech: 10, cb: 15, ds: 10, ed: 8, dr: 12,
-    lapk: 2, mapk: 1, fcr: 2, skills: 12, mf: 2, rep: 4, ar: 2, dmg: 6, frw: 4, life: 3,
+    lapk: 2, mapk: 1, fcr: 2, skills: 12, mf: 2, rep: 4, ar: 2, dmg: 6, frw: 4,
     mana: 1, cold_dmg: 2, fire_dmg: 2, lightning_dmg: 2, poison_dmg: 2
   },
   caster: {
     hp: 4, vit: 10, str: 0, dex: 0, res: 12, ias: 2, leech: 0, cb: 0, ds: 0, ed: 0, dr: 6,
-    lapk: 1, mapk: 6, fcr: 10, skills: 15, mf: 4, rep: 3, ar: 0, dmg: 1, frw: 2, life: 4,
+    lapk: 1, mapk: 6, fcr: 10, skills: 15, mf: 4, rep: 3, ar: 0, dmg: 1, frw: 2,
     mana: 5, cold_dmg: 4, fire_dmg: 4, lightning_dmg: 4, poison_dmg: 4
   }
 };
@@ -123,7 +123,10 @@ function extractValue(text, pattern) {
   const match = text.match(pattern);
   if (!match) return 0;
   for (let i = 1; i < match.length; i++) {
-    if (match[i]) return parseInt(match[i]);
+    if (match[i]) {
+      const numeric = parseFloat(match[i]);
+      return Number.isNaN(numeric) ? 0 : numeric;
+    }
   }
   return 0;
 }
@@ -149,7 +152,7 @@ function computeScore(rawText) {
         extractValue(text, /(?:POISON\s*RESIST(?:ANCE)?|RESISTANCE\s*AU\s*POISON)\s*\+?([0-9]+)/)
       ];
       const allRes = extractValue(text, /ALL\s*RESIST(?:ANCE)?S?\s*\+?([0-9]+)/);
-      return indiv.reduce((a, b) => a + b, 0) + (allRes ? allRes * 4 : 0);
+      return indiv.reduce((a, b) => a + b, 0) + allRes;
     })(),
     dr: extractValue(text, /(?:DAMAGE\s*REDUCED\s*BY|DEGATS\s*REDUITS\s*DE)\s*([0-9]+)/),
     fcr: extractValue(text, /([0-9]+)%\s*(?:FASTER\s*CAST\s*RATE|VITESSE\s*DE\s*LANCEMENT)/),
@@ -184,7 +187,15 @@ function computeScore(rawText) {
       /(?:ADDS\s*([0-9]+)-[0-9]+\s*DAMAGE|AJOUTE\s*([0-9]+)-[0-9]+\s*DEGATS)\s*(?:PER\s*LEVEL|PAR\s*NIVEAU|NIVEAU\s*DU\s*PERSONNAGE)/
     ),
     frw: extractValue(text, /([0-9]+)%\s*(?:FASTER\s*RUN\/WALK|MARCHE.*COURSE.*RAPIDE)/),
-    life: extractValue(text, /\+([0-9]+)\s*(?:TO\s*LIFE|A\s*LA\s*VIE)/),
+    hp: extractValue(text, /\+([0-9]+)\s*(?:TO\s*)?(?:LIFE|HP|POINTS?\s*DE\s*VIE)/),
+    lapk: extractValue(
+      text,
+      /\+([0-9]+)\s*(?:LIFE\s*AFTER\s*(?:EACH|EVERY)\s*KILL|VIE\s*APRES\s*CHAQUE\s*TUE?)/
+    ),
+    mapk: extractValue(
+      text,
+      /\+([0-9]+)\s*(?:MANA\s*AFTER\s*(?:EACH|EVERY)\s*KILL|MANA\s*APRES\s*CHAQUE\s*TUE?)/
+    ),
     mana: extractValue(text, /\+([0-9]+)\s*(?:TO\s*MANA|AU\s*MANA)/),
     cold_dmg: extractValue(text, /(?:ADDS\s*([0-9]+)-[0-9]+\s*COLD\s*DAMAGE|AJOUTE\s*([0-9]+)-[0-9]+\s*DEGATS\s*DE\s*FROID)/),
     fire_dmg: extractValue(text, /(?:ADDS\s*([0-9]+)-[0-9]+\s*FIRE\s*DAMAGE|AJOUTE\s*([0-9]+)-[0-9]+\s*DEGATS\s*DE\s*FEU)/),
