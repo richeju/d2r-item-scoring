@@ -409,14 +409,18 @@ async function processImageBlob(blob) {
 
 let isProcessingImage = false;
 let processingQueue = Promise.resolve();
+let queuedImageCount = 0;
 
 function enqueueImageProcessing(blob) {
   if (!blob) return Promise.resolve();
 
+  queuedImageCount += 1;
+  if (isProcessingImage) {
+    debugLog(`Une autre image est en cours, ajout en file d'attente (en attente: ${queuedImageCount - 1}).`);
+  }
+
   const queuedTask = processingQueue.then(async () => {
-    if (isProcessingImage) {
-      debugLog('Une autre image est en cours, ajout en file d\'attente...');
-    }
+    queuedImageCount = Math.max(0, queuedImageCount - 1);
     isProcessingImage = true;
     try {
       await processImageBlob(blob);
@@ -437,11 +441,10 @@ document.getElementById('screenshot').addEventListener('change', async function(
   const file = input?.files?.[0];
   if (!file) return;
   debugLog('Image file selected, processing...');
+  // Reset immediately so the same file can be selected again while processing another one
+  input.value = '';
   try {
     await enqueueImageProcessing(file);
-  } finally {
-    // Reset after processing so picking the same file again still triggers a change event
-    input.value = '';
   }
 });
 
