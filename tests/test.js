@@ -16,6 +16,8 @@ const cleaned2 = fixCommonOcrMistakes('DAMACE REDUCED BY 15%');
 assert.ok(cleaned2.includes('DAMAGE'), 'should fix DAMACE spelling');
 const cleaned3 = fixCommonOcrMistakes('+1 T ALL SKILLS');
 assert.ok(cleaned3.includes(' TO ALL SKILLS'), 'should fix TO ALL SKILLS');
+const cleaned4 = fixCommonOcrMistakes('LIGHNING DAMAGE');
+assert.ok(cleaned4.includes('LIGHTNING'), 'should normalize misspelled lightning');
 console.log('fixCommonOcrMistakes check passed');
 
 const normalizeStart = html.indexOf('function normalizeText');
