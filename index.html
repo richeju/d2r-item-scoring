@@ -408,10 +408,15 @@ async function processImageBlob(blob) {
 }
 
 document.getElementById('screenshot').addEventListener('change', async function(event) {
-  const file = event.target.files[0];
-  if (file) {
-    debugLog('Image file selected, processing...');
+  const input = event.target;
+  const file = input?.files?.[0];
+  if (!file) return;
+  debugLog('Image file selected, processing...');
+  try {
     await processImageBlob(file);
+  } finally {
+    // Reset after processing so picking the same file again still triggers a change event
+    input.value = '';
   }
 });
 
@@ -427,26 +432,51 @@ document.getElementById('archetype').addEventListener('change', () => {
   computeScore(currentText);
 });
 
-document.addEventListener('paste', async event => {
+function pickImageFromItems(items) {
+  if (!items || !items.length) return null;
+  for (const item of Array.from(items)) {
+    const isImageType = item.type?.startsWith('image/');
+    const looksLikeFile = item.kind === 'file' || item instanceof File;
+    if (!isImageType && !looksLikeFile) continue;
+    const file = item.getAsFile ? item.getAsFile() : item;
+    if (file && (file.type?.startsWith('image/') || !file.type)) {
+      return file;
+    }
+  }
+  return null;
+}
+
+async function getImageBlobFromClipboardEvent(event) {
   const clipboardData = event.clipboardData || window.clipboardData;
-  if (!clipboardData) {
-    debugLog('Impossible de lire le presse-papiers.');
-    return;
+  if (clipboardData) {
+    const fromFiles = pickImageFromItems(clipboardData.files);
+    if (fromFiles) return fromFiles;
+    const fromItems = pickImageFromItems(clipboardData.items);
+    if (fromItems) return fromItems;
   }
-  const items = clipboardData.items || clipboardData.files;
-  if (!items || !items.length) {
-    debugLog('Presse-papiers sans image détectée.');
-    return;
+  if (navigator.clipboard?.read) {
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      for (const item of clipboardItems) {
+        const imageType = item.types.find(type => type.startsWith('image/'));
+        if (!imageType) continue;
+        const blob = await item.getType(imageType);
+        if (blob) return blob;
+      }
+    } catch (err) {
+      debugLog("Lecture du presse-papiers refusée ou non supportée: " + err.message);
+    }
   }
-  const iterableItems = Array.from(items);
-  const imageItem = iterableItems.find(item => item.type && item.type.startsWith('image/'));
-  if (!imageItem) return;
-  event.preventDefault();
-  const blob = imageItem.getAsFile ? imageItem.getAsFile() : imageItem;
+  return null;
+}
+
+document.addEventListener('paste', async event => {
+  const blob = await getImageBlobFromClipboardEvent(event);
   if (!blob) {
-    debugLog("Impossible de récupérer l'image collée.");
+    debugLog('Aucune image détectée dans le presse-papiers.');
     return;
   }
+  event.preventDefault();
   debugLog('Image collée depuis le presse-papiers, traitement...');
   await processImageBlob(blob);
 });
