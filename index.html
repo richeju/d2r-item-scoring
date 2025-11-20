@@ -407,13 +407,38 @@ async function processImageBlob(blob) {
   }
 }
 
+let isProcessingImage = false;
+let processingQueue = Promise.resolve();
+
+function enqueueImageProcessing(blob) {
+  if (!blob) return Promise.resolve();
+
+  const queuedTask = processingQueue.then(async () => {
+    if (isProcessingImage) {
+      debugLog('Une autre image est en cours, ajout en file d\'attente...');
+    }
+    isProcessingImage = true;
+    try {
+      await processImageBlob(blob);
+    } finally {
+      isProcessingImage = false;
+    }
+  });
+
+  processingQueue = queuedTask.catch(err => {
+    debugLog('Erreur lors du traitement d\'une image en attente: ' + err.message);
+  });
+
+  return queuedTask;
+}
+
 document.getElementById('screenshot').addEventListener('change', async function(event) {
   const input = event.target;
   const file = input?.files?.[0];
   if (!file) return;
   debugLog('Image file selected, processing...');
   try {
-    await processImageBlob(file);
+    await enqueueImageProcessing(file);
   } finally {
     // Reset after processing so picking the same file again still triggers a change event
     input.value = '';
@@ -478,7 +503,7 @@ document.addEventListener('paste', async event => {
   }
   event.preventDefault();
   debugLog('Image collée depuis le presse-papiers, traitement...');
-  await processImageBlob(blob);
+  await enqueueImageProcessing(blob);
 });
 </script>
 
