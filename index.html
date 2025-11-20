@@ -112,6 +112,7 @@ function normalizeText(text) {
     text
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/HTNING/g, 'LIGHTNING')
+      .replace(/LIGH?TN?ING/g, 'LIGHTNING')
       .replace(/ST®LEN/g, 'STOLEN')
       .replace(/TIAGE/g, 'DAMAGE')
       .replace(/1Q%/g, '10%')
@@ -157,6 +158,8 @@ function fixCommonOcrMistakes(text) {
   const replacements = {
     'PEISEN': 'POISON',
     'LIGLIGHTNING': 'LIGHTNING',
+    'LIGHNING': 'LIGHTNING',
+    'LIGHTNINGD': 'LIGHTNING',
     '+1%': '+10%',
     'RERTL': 'RIGHT',
     'CRLICK': 'CLICK',
@@ -410,6 +413,18 @@ document.getElementById('screenshot').addEventListener('change', async function(
     debugLog('Image file selected, processing...');
     await processImageBlob(file);
   }
+});
+
+document.getElementById('archetype').addEventListener('change', () => {
+  const input = document.getElementById('ocrInput');
+  if (!input) return;
+  const currentText = input.value.trim();
+  if (!currentText) {
+    debugLog('Aucun texte pour recalculer le score pour cet archétype.');
+    return;
+  }
+  debugLog('Recalcul du score pour le nouvel archétype.');
+  computeScore(currentText);
 });
 
 document.addEventListener('paste', async event => {
