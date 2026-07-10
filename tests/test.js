@@ -1,10 +1,20 @@
 const fs = require('fs');
 const assert = require('assert');
+const vm = require('vm');
 assert.ok(fs.existsSync('index.html'), 'index.html should exist');
 console.log('Basic check passed: index.html exists');
 
 // Verify fixCommonOcrMistakes handles special characters
 const html = fs.readFileSync('index.html', 'utf8');
+const inlineScripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)]
+  .map(match => match[1])
+  .filter(script => script.trim());
+assert.ok(inlineScripts.length > 0, 'index.html should contain an inline application script');
+for (const script of inlineScripts) {
+  new vm.Script(script, { filename: 'index.html' });
+}
+console.log('Inline JavaScript syntax check passed');
+
 const fixStart = html.indexOf('function fixCommonOcrMistakes');
 const fixEnd = html.indexOf('function extractValue', fixStart);
 assert(fixStart !== -1 && fixEnd !== -1, 'fixCommonOcrMistakes function not found');
