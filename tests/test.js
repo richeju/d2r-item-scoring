@@ -30,6 +30,10 @@ const cleaned4 = fixCommonOcrMistakes('LIGHNING DAMAGE');
 assert.ok(cleaned4.includes('LIGHTNING'), 'should normalize misspelled lightning');
 console.log('fixCommonOcrMistakes check passed');
 
+const extractEnd = html.indexOf('function debugLog', fixEnd);
+assert(extractEnd !== -1, 'extractValue function end not found');
+eval(html.slice(fixEnd, extractEnd));
+
 const normalizeStart = html.indexOf('function normalizeText');
 assert(normalizeStart !== -1, 'normalizeText function not found');
 const normalizeTextBlock = html.slice(normalizeStart, fixStart);
@@ -41,3 +45,33 @@ assert.ok(
   'should restore missing plus for resistances'
 );
 console.log('normalizeText check passed');
+
+const beltOcr = normalizeText(
+  'STONE BUCKLE BELT DEFENSE 7 DURABILITY 11 OF 16 REQUIRED STRENGTH 26 ' +
+  'REQUIRED LEVEL 4 16% TO ATTACK RATING 24% ENHANCED DEFENSE ' +
+  '2 TO STRENGTH +6 MAXIMUM STAMINA LIGHTNING RESIST +8'
+);
+assert.ok(beltOcr.includes('+2 TO STRENGTH'), 'should restore a missing plus before strength');
+assert.ok(beltOcr.includes('+6 MAXIMUM STAMINA'), 'should preserve maximum stamina');
+
+const attackRating = extractValue(
+  beltOcr,
+  /\+?([0-9]+)%?\s*(?:TO\s+)?(?:ATTACK\s*RATING|TAUX\s*D?ATTAQUE)/
+);
+const enhancedDefense = extractValue(
+  beltOcr,
+  /([0-9]+)%\s*(?:ENHANCED\s*DEFENSE|DEFENSE\s*ENHANCED|DEFENSE\s*AMELIOREE)/
+);
+const strength = extractValue(
+  beltOcr,
+  /\+?([0-9]+)\s+(?:(?:TO\s+)?(?:STRENGTH|STR)|(?:TO\s+)?FORCE)/
+);
+const stamina = extractValue(
+  beltOcr,
+  /\+?([0-9]+)\s*(?:TO\s*)?(?:MAXIMUM\s*STAMINA|ENDURANCE\s*MAXIMALE)/
+);
+assert.strictEqual(attackRating, 16, 'should parse percentage to attack rating');
+assert.strictEqual(enhancedDefense, 24, 'should parse enhanced defense');
+assert.strictEqual(strength, 2, 'should parse strength without using required strength');
+assert.strictEqual(stamina, 6, 'should parse maximum stamina');
+console.log('Stone Buckle OCR regression check passed');

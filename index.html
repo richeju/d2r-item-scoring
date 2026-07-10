@@ -67,12 +67,14 @@ const weightsByArchetype = {
   melee: {
     hp: 3, vit: 8, str: 6, dex: 4, res: 10, ias: 12, leech: 10, cb: 15, ds: 10, ed: 8, dr: 12,
     lapk: 2, mapk: 1, fcr: 2, skills: 12, mf: 2, rep: 4, ar: 2, dmg: 6, frw: 4,
-    mana: 1, cold_dmg: 2, fire_dmg: 2, lightning_dmg: 2, poison_dmg: 2
+    mana: 1, defense: 2, stamina: 1,
+    cold_dmg: 2, fire_dmg: 2, lightning_dmg: 2, poison_dmg: 2
   },
   caster: {
     hp: 4, vit: 10, str: 0, dex: 0, res: 12, ias: 2, leech: 0, cb: 0, ds: 0, ed: 0, dr: 6,
     lapk: 1, mapk: 6, fcr: 10, skills: 15, mf: 4, rep: 3, ar: 0, dmg: 1, frw: 2,
-    mana: 5, cold_dmg: 4, fire_dmg: 4, lightning_dmg: 4, poison_dmg: 4
+    mana: 5, defense: 1, stamina: 0.5,
+    cold_dmg: 4, fire_dmg: 4, lightning_dmg: 4, poison_dmg: 4
   }
 };
 
@@ -141,7 +143,8 @@ function restoreMissingPlusSigns(text) {
     'COLD RESIST', 'COLD RESISTANCE', 'POISON RESIST', 'POISON RESISTANCE',
     'RESISTANCE AU FROID', 'RESISTANCE AU FEU', 'RESISTANCE AU POISON', 'RESISTANCE A LA FOUDRE',
     'ALL RESIST', 'ALL RESISTANCES', 'ATTACK RATING', 'TAUX D ATTAQUE',
-    'MAXIMUM DAMAGE', 'MAXIMUM DEGATS', 'MINIMUM DAMAGE', 'MINIMUM DEGATS'
+    'MAXIMUM DAMAGE', 'MAXIMUM DEGATS', 'MINIMUM DAMAGE', 'MINIMUM DEGATS',
+    'MAXIMUM STAMINA', 'ENDURANCE MAXIMALE'
   ];
   const keywordsPattern = keywords
     .map(keyword => keyword.replace(/\s+/g, '\\s+'))
@@ -231,9 +234,9 @@ function computeScore(rawText) {
     ds: extractValue(text, /([0-9]+)%\s*(?:DEADLY\s*STRIKE|COUP\s*MORTEL)/),
     ed: extractValue(text, /([0-9]+)%\s*(?:ENHANCED\s*DAMAGE|DEGATS\s*AUGMENTES)/),
     ed_per_lvl: extractValue(text, /([0-9]+(?:\.[0-9]+)?)%\s*(?:ENHANCED\s*DAMAGE|DEGATS\s*AUGMENTES)\s*(?:PER\s*CHARACTER\s*LEVEL|PAR\s*NIVEAU|NIVEAU\s*DU\s*PERSONNAGE)/),
-    str: extractValue(text, /\+([0-9]+)\s*(?:TO\s*)?(?:STRENGTH|FORCE|STR)/),
-    dex: extractValue(text, /\+([0-9]+)\s*(?:TO\s*)?(?:DEXTERITY|DEXTERITE|DEX)/),
-    vit: extractValue(text, /\+([0-9]+)\s*(?:TO\s*)?(?:VITALITY|VITALITE|VIT)/),
+    str: extractValue(text, /\+?([0-9]+)\s+(?:(?:TO\s+)?(?:STRENGTH|STR)|(?:TO\s+)?FORCE)/),
+    dex: extractValue(text, /\+?([0-9]+)\s+(?:(?:TO\s+)?DEXTERITY|DEXTERITE|DEX)/),
+    vit: extractValue(text, /\+?([0-9]+)\s+(?:(?:TO\s+)?VITALITY|VITALITE|VIT)/),
     skills: extractValue(
       text,
       /\+([0-9]+)\s*(?:(?:TO\s*)?(?:ALL\s*SKILLS|[A-Z\s]+\s*SKILLS)|A\s*TOUTES\s*LES\s*COMPETENCES)/
@@ -242,8 +245,10 @@ function computeScore(rawText) {
     rep: extractValue(text, /(?:REPLENISH\s*LIFE|REGENER[EA]\s*LA\s*VIE)\s*\+?([0-9]+)/),
     ar: extractValue(
       text,
-      /\+?([0-9]+)%?\s*(?:ATTACK\s*RATING|TAUX\s*D?ATTAQUE)(?:\s*(?:BASED\s*ON\s*CHARACTER\s*LEVEL|PER\s*LEVEL|PAR\s*NIVEAU|NIVEAU\s*DU\s*PERSONNAGE))?/
+      /\+?([0-9]+)%?\s*(?:TO\s+)?(?:ATTACK\s*RATING|TAUX\s*D?ATTAQUE)(?:\s*(?:BASED\s*ON\s*CHARACTER\s*LEVEL|PER\s*LEVEL|PAR\s*NIVEAU|NIVEAU\s*DU\s*PERSONNAGE))?/
     ),
+    defense: extractValue(text, /([0-9]+)%\s*(?:ENHANCED\s*DEFENSE|DEFENSE\s*ENHANCED|DEFENSE\s*AMELIOREE)/),
+    stamina: extractValue(text, /\+?([0-9]+)\s*(?:TO\s*)?(?:MAXIMUM\s*STAMINA|ENDURANCE\s*MAXIMALE)/),
     dmg: extractValue(
       text,
       new RegExp(
