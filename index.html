@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <title>D2R Equipment Scoring</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <script src="src/scoring.js"></script>
   <style>
     body { font-family: Arial; background: #1e1e1e; color: #eee; padding: 2rem; }
     .container { display: flex; flex-direction: row; gap: 2rem; align-items: flex-start; }
@@ -64,6 +63,144 @@
 </div>
 
 <script>
+const weightsByArchetype = {
+  melee: {
+    hp: 3, vit: 8, str: 6, dex: 4, res: 10, ias: 12, leech: 10, cb: 15, ds: 10, ed: 8, dr: 12,
+    lapk: 2, mapk: 1, fcr: 2, skills: 12, mf: 2, rep: 4, ar: 2, dmg: 6, frw: 4,
+    mana: 1, cold_dmg: 2, fire_dmg: 2, lightning_dmg: 2, poison_dmg: 2
+  },
+  caster: {
+    hp: 4, vit: 10, str: 0, dex: 0, res: 12, ias: 2, leech: 0, cb: 0, ds: 0, ed: 0, dr: 6,
+    lapk: 1, mapk: 6, fcr: 10, skills: 15, mf: 4, rep: 3, ar: 0, dmg: 1, frw: 2,
+    mana: 5, cold_dmg: 4, fire_dmg: 4, lightning_dmg: 4, poison_dmg: 4
+  }
+};
+
+const evaluationThresholds = {
+  melee: [
+    { limit: 60, label: 'Faible', className: 'evaluation-poor', hint: "Les bonus sont trop faibles pour un perso mêlée." },
+    { limit: 120, label: 'Correct', className: 'evaluation-average', hint: "Correct pour dépanner, mais il existe mieux." },
+    { limit: Infinity, label: 'Excellent', className: 'evaluation-strong', hint: "Très bon potentiel pour un build mêlée." }
+  ],
+  caster: [
+    { limit: 50, label: 'Faible', className: 'evaluation-poor', hint: "Pas assez d'avantages pour un lanceur de sorts." },
+    { limit: 100, label: 'Correct', className: 'evaluation-average', hint: "Peut rendre service en attendant mieux." },
+    { limit: Infinity, label: 'Excellent', className: 'evaluation-strong', hint: "Convient bien à un caster ambitieux." }
+  ]
+};
+
+function describeTopContributions(contributions) {
+  if (!contributions.length) return '';
+  const top = contributions
+    .sort((a, b) => b.subtotal - a.subtotal)
+    .slice(0, 3)
+    .map(entry => `${entry.key} (+${entry.subtotal})`);
+  return 'Points forts : ' + top.join(', ') + '.';
+}
+
+function summarizeScore(score, archetype, contributions) {
+  const tiers = evaluationThresholds[archetype] || evaluationThresholds.melee;
+  const tier = tiers.find(t => score < t.limit) || tiers[tiers.length - 1];
+  return {
+    message: `${tier.label} (${score} pts). ${tier.hint} ${describeTopContributions(contributions)}`.trim(),
+    className: tier.className
+  };
+}
+
+function normalizeText(text) {
+  const cleaned = fixCommonOcrMistakes(
+    text
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/HTNING/g, 'LIGHTNING')
+      .replace(/LIGH?TN?ING/g, 'LIGHTNING')
+      .replace(/ST®LEN/g, 'STOLEN')
+      .replace(/TIAGE/g, 'DAMAGE')
+      .replace(/1Q%/g, '10%')
+      .replace(/[Q\[\{\(]/g, '0')
+      .replace(/[\\]/g, '')
+      .replace(/[*|©@]/g, '+')
+      .replace(/Teo/gi, 'To')
+      .replace(/[|]/g, '1')
+      .replace(/#1@%/g, '+10%')
+      .replace(/([0-9]+)%([A-Z])/g, '$1% $2')
+      .replace(/([A-Z])([0-9]+)%/g, '$1 $2%')
+      .replace(/([A-Z])0([A-Z])/g, '$1O$2')
+      .replace(/([A-Z])5([A-Z])/g, '$1S$2')
+      .replace(/([A-Z])1([A-Z])/g, '$1I$2')
+      .replace(/\s+/g, ' ')
+      .toUpperCase()
+  );
+  return restoreMissingPlusSigns(cleaned);
+}
+
+function restoreMissingPlusSigns(text) {
+  const keywords = [
+    'STRENGTH', 'FORCE', 'DEXTERITY', 'DEXTERITE', 'VITALITY', 'VITALITE',
+    'ENERGY', 'ENERGIE', 'LIFE', 'VIE', 'MANA', 'SKILLS', 'COMPETENCES',
+    'ALL SKILLS', 'LIGHTNING RESIST', 'LIGHTNING RESISTANCE', 'FIRE RESIST', 'FIRE RESISTANCE',
+    'COLD RESIST', 'COLD RESISTANCE', 'POISON RESIST', 'POISON RESISTANCE',
+    'RESISTANCE AU FROID', 'RESISTANCE AU FEU', 'RESISTANCE AU POISON', 'RESISTANCE A LA FOUDRE',
+    'ALL RESIST', 'ALL RESISTANCES', 'ATTACK RATING', 'TAUX D ATTAQUE',
+    'MAXIMUM DAMAGE', 'MAXIMUM DEGATS', 'MINIMUM DAMAGE', 'MINIMUM DEGATS'
+  ];
+  const keywordsPattern = keywords
+    .map(keyword => keyword.replace(/\s+/g, '\\s+'))
+    .join('|');
+  if (!keywordsPattern) return text;
+  const statRegex = new RegExp(
+    `(^|\\s)([0-9]+)(?=\\s*(?:%\\s*)?(?:TO\\s+)?(?:${keywordsPattern})\\b)`,
+    'g'
+  );
+  return text.replace(statRegex, (match, prefix, value) => `${prefix}+${value}`);
+}
+
+function fixCommonOcrMistakes(text) {
+  const replacements = {
+    'PEISEN': 'POISON',
+    'LIGLIGHTNING': 'LIGHTNING',
+    'LIGHNING': 'LIGHTNING',
+    'LIGHTNINGD': 'LIGHTNING',
+    '+1%': '+10%',
+    'RERTL': 'RIGHT',
+    'CRLICK': 'CLICK',
+    'DRAE': 'DROP',
+    'DAMACE': 'DAMAGE',
+    'SECKETED': 'SOCKETED',
+    'RE0UIRED': 'REQUIRED',
+    ' T ALL SKILLS': ' TO ALL SKILLS',
+    'TWE-HAND': 'TWO-HAND',
+    'NERMAL': 'NORMAL',
+    'DURASILITY': 'DURABILITY',
+    'MIRE': 'DIRE',
+    '5KILLS': 'SKILLS',
+    '1TEM': 'ITEM'
+  };
+  for (let key in replacements) {
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    text = text.replace(new RegExp(escapedKey, 'g'), replacements[key]);
+  }
+  text = text.replace(/([0-9]+)6(?=\s|$)/g, '$1%');
+  text = text.replace(/\bN\s*CHARACTER\s*LEVEL\b/g, 'ON CHARACTER LEVEL');
+  text = text.replace(/\bTE\b/g, 'TO');
+  text = text.replace(/PAMACE/g, 'DAMAGE');
+  text = text.replace(/AMAZEN/g, 'AMAZON');
+  text = text.replace(/\bEF\b/g, 'OF');
+  text = text.replace(/\b0F\b/g, 'OF');
+  return text;
+}
+
+function extractValue(text, pattern) {
+  const match = text.match(pattern);
+  if (!match) return 0;
+  for (let i = 1; i < match.length; i++) {
+    if (match[i]) {
+      const numeric = parseFloat(match[i]);
+      return Number.isNaN(numeric) ? 0 : numeric;
+    }
+  }
+  return 0;
+}
+
 function debugLog(message) {
   const el = document.getElementById('debugLog');
   if (el) el.value += message + '\n';
@@ -73,30 +210,101 @@ function debugLog(message) {
 function computeScore(rawText) {
   const dbg = document.getElementById('debugLog');
   if (dbg) dbg.value = '';
+  const text = normalizeText(rawText);
+  debugLog('Normalized text: ' + text);
+  const stats = {
+    leech: extractValue(text, /([0-9]+)%?\s*(?:LIFE\s*STOLEN(?:\s*PER\s*HIT)?|VOL\s*DE\s*VIE(?:\s*PAR\s*COUP)?)/),
+    res: (function() {
+      const indiv = [
+        extractValue(text, /(?:COLD\s*RESIST(?:ANCE)?|RESISTANCE\s*AU\s*FROID)\s*\+?([0-9]+)/),
+        extractValue(text, /(?:LIGHTNING\s*RESIST(?:ANCE)?|RESISTANCE\s*A\s*LA\s*FOUDRE)\s*\+?([0-9]+)/),
+        extractValue(text, /(?:FIRE\s*RESIST(?:ANCE)?|RESISTANCE\s*AU\s*FEU)\s*\+?([0-9]+)/),
+        extractValue(text, /(?:POISON\s*RESIST(?:ANCE)?|RESISTANCE\s*AU\s*POISON)\s*\+?([0-9]+)/)
+      ];
+      const allRes = extractValue(text, /ALL\s*RESIST(?:ANCE)?S?\s*\+?([0-9]+)/);
+      return indiv.reduce((a, b) => a + b, 0) + allRes;
+    })(),
+    dr: extractValue(text, /(?:DAMAGE\s*REDUCED\s*BY|DEGATS\s*REDUITS\s*DE)\s*([0-9]+)/),
+    fcr: extractValue(text, /([0-9]+)%\s*(?:FASTER\s*CAST\s*RATE|VITESSE\s*DE\s*LANCEMENT)/),
+    ias: extractValue(text, /([0-9]+)%\s*(?:INCREASED\s*ATTACK\s*SPEED|VITESSE\s*D?ATTAQUE\s*AUGMENTEE)/),
+    cb: extractValue(text, /([0-9]+)%\s*(?:CHANCE\s*OF\s*CRUSHING\s*BLOW|CHANCE\s*DE\s*COUP\s*ECRASANT)/),
+    ds: extractValue(text, /([0-9]+)%\s*(?:DEADLY\s*STRIKE|COUP\s*MORTEL)/),
+    ed: extractValue(text, /([0-9]+)%\s*(?:ENHANCED\s*DAMAGE|DEGATS\s*AUGMENTES)/),
+    ed_per_lvl: extractValue(text, /([0-9]+(?:\.[0-9]+)?)%\s*(?:ENHANCED\s*DAMAGE|DEGATS\s*AUGMENTES)\s*(?:PER\s*CHARACTER\s*LEVEL|PAR\s*NIVEAU|NIVEAU\s*DU\s*PERSONNAGE)/),
+    str: extractValue(text, /\+([0-9]+)\s*(?:TO\s*)?(?:STRENGTH|FORCE|STR)/),
+    dex: extractValue(text, /\+([0-9]+)\s*(?:TO\s*)?(?:DEXTERITY|DEXTERITE|DEX)/),
+    vit: extractValue(text, /\+([0-9]+)\s*(?:TO\s*)?(?:VITALITY|VITALITE|VIT)/),
+    skills: extractValue(
+      text,
+      /\+([0-9]+)\s*(?:(?:TO\s*)?(?:ALL\s*SKILLS|[A-Z\s]+\s*SKILLS)|A\s*TOUTES\s*LES\s*COMPETENCES)/
+    ),
+    mf: extractValue(text, /([0-9]+)%\s*(?:BETTER\s*CHANCE.*FIND|CHANCE.*OBJETS)/),
+    rep: extractValue(text, /(?:REPLENISH\s*LIFE|REGENER[EA]\s*LA\s*VIE)\s*\+?([0-9]+)/),
+    ar: extractValue(
+      text,
+      /\+?([0-9]+)%?\s*(?:ATTACK\s*RATING|TAUX\s*D?ATTAQUE)(?:\s*(?:BASED\s*ON\s*CHARACTER\s*LEVEL|PER\s*LEVEL|PAR\s*NIVEAU|NIVEAU\s*DU\s*PERSONNAGE))?/
+    ),
+    dmg: extractValue(
+      text,
+      new RegExp(
+        '(?:ADDS\\s*([0-9]+)-[0-9]+\\s*DAMAGE|' +
+          'AJOUTE\\s*([0-9]+)-[0-9]+\\s*DEGATS|' +
+          '\\+([0-9]+)\\s*(?:TO\\s*MAXIMUM\\s*DAMAGE|MAXIMUM\\s*DAMAGE))'
+      )
+    ),
+    dmg_per_lvl: extractValue(
+      text,
+      /(?:ADDS\s*([0-9]+)-[0-9]+\s*DAMAGE|AJOUTE\s*([0-9]+)-[0-9]+\s*DEGATS)\s*(?:PER\s*LEVEL|PAR\s*NIVEAU|NIVEAU\s*DU\s*PERSONNAGE)/
+    ),
+    frw: extractValue(text, /([0-9]+)%\s*(?:FASTER\s*RUN\/WALK|MARCHE.*COURSE.*RAPIDE)/),
+    hp: extractValue(text, /\+([0-9]+)\s*(?:TO\s*)?(?:LIFE|HP|POINTS?\s*DE\s*VIE)/),
+    lapk: extractValue(
+      text,
+      /\+([0-9]+)\s*(?:LIFE\s*AFTER\s*(?:EACH|EVERY)\s*KILL|VIE\s*APRES\s*CHAQUE\s*TUE?)/
+    ),
+    mapk: extractValue(
+      text,
+      /\+([0-9]+)\s*(?:MANA\s*AFTER\s*(?:EACH|EVERY)\s*KILL|MANA\s*APRES\s*CHAQUE\s*TUE?)/
+    ),
+    mana: extractValue(text, /\+([0-9]+)\s*(?:TO\s*MANA|AU\s*MANA)/),
+    cold_dmg: extractValue(text, /(?:ADDS\s*([0-9]+)-[0-9]+\s*COLD\s*DAMAGE|AJOUTE\s*([0-9]+)-[0-9]+\s*DEGATS\s*DE\s*FROID)/),
+    fire_dmg: extractValue(text, /(?:ADDS\s*([0-9]+)-[0-9]+\s*FIRE\s*DAMAGE|AJOUTE\s*([0-9]+)-[0-9]+\s*DEGATS\s*DE\s*FEU)/),
+    lightning_dmg: extractValue(text, /(?:ADDS\s*([0-9]+)-[0-9]+\s*LIGHTNING\s*DAMAGE|AJOUTE\s*([0-9]+)-[0-9]+\s*DEGATS\s*DE\s*FOUDRE)/),
+    poison_dmg: extractValue(text, /(?:ADDS\s*([0-9]+)-[0-9]+\s*POISON\s*DAMAGE|AJOUTE\s*([0-9]+)-[0-9]+\s*DEGATS\s*DE\s*POISON)/)
+  };
 
-  const archetype = document.getElementById('archetype').value;
-  const details = D2RScoring.computeScoreDetails(rawText, archetype);
-  const tbody = document.getElementById('detailsTable').querySelector('tbody');
-  tbody.innerHTML = '';
+  const archetype = document.getElementById("archetype").value;
+  const weights = weightsByArchetype[archetype];
+  let score = 0;
+  const tbody = document.getElementById("detailsTable").querySelector("tbody");
+  tbody.innerHTML = "";
 
-  for (const entry of details.contributions) {
-    const row = document.createElement('tr');
-    row.innerHTML = `<td>${entry.key}</td><td>${entry.value}</td><td>${entry.weight}</td><td>${entry.subtotal}</td>`;
-    tbody.appendChild(row);
+  const contributions = [];
+  for (let key in stats) {
+    const value = stats[key];
+    const weight = weights[key] || 0;
+    const subtotal = value * weight;
+    if (value && weight) {
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>${key}</td><td>${value}</td><td>${weight}</td><td>${subtotal}</td>`;
+      tbody.appendChild(row);
+      score += subtotal;
+      contributions.push({ key, subtotal });
+    }
   }
 
-  document.getElementById('result').textContent = 'Item total score: ' + details.score;
-  document.getElementById('ocrInput').value = details.normalizedText;
+  document.getElementById("result").textContent = "Item total score: " + score;
+  document.getElementById("ocrInput").value = text;
   const evaluationBox = document.getElementById('evaluation');
-  evaluationBox.textContent = details.summary.message;
-  evaluationBox.className = `evaluation ${details.summary.className}`;
-  debugLog('Normalized text: ' + details.normalizedText);
-  debugLog('Stats: ' + JSON.stringify(details.stats));
-  debugLog('Score: ' + details.score);
+  const summary = summarizeScore(score, archetype, contributions);
+  evaluationBox.textContent = summary.message;
+  evaluationBox.className = `evaluation ${summary.className}`;
+  debugLog('Stats: ' + JSON.stringify(stats));
+  debugLog('Score: ' + score);
 }
 
 function processManualInput() {
-  const text = document.getElementById('ocrInput').value;
+  const text = document.getElementById("ocrInput").value;
   debugLog('Manual input: ' + text);
   computeScore(text);
 }
@@ -110,7 +318,7 @@ function resetSelection() {
   document.getElementById('debugLog').value = '';
   const evaluationBox = document.getElementById('evaluation');
   if (evaluationBox) {
-    evaluationBox.textContent = 'Chargez un objet pour voir l\'analyse.';
+    evaluationBox.textContent = 'Chargez un objet pour voir l'analyse.';
     evaluationBox.className = 'evaluation';
   }
   const canvas = document.getElementById('canvas');
@@ -166,7 +374,7 @@ async function runOcrOnDataURL(dataURL) {
       await worker.initialize('eng+fra');
     }
     await worker.setParameters({
-      tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-%/ '
+      tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-% '
     });
     const { data: { text } } = await worker.recognize(dataURL);
     debugLog('Raw OCR: ' + text);
@@ -244,7 +452,7 @@ async function getImageBlobFromClipboardEvent(event) {
         if (blob) return blob;
       }
     } catch (err) {
-      debugLog('Lecture du presse-papiers refusée ou non supportée: ' + err.message);
+      debugLog("Lecture du presse-papiers refusée ou non supportée: " + err.message);
     }
   }
   return null;
